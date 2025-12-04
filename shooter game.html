@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tiro Rápido - Shooter</title>
+  <style>
+    :root{
+      --bg:#0f1724;
+      --panel:#0b1220;
+      --accent:#ff4757;
+      --muted:#9aa6b2;
+      --card:#0f1728;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,#071025 0%, #0f1724 100%);color:#e6eef6;font-family:Inter,system-ui,Segoe UI,Arial;}
+
+    /* Container */
+    .app{display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px}
+    .panel{width:980px;max-width:100%;background:rgba(255,255,255,0.02);border-radius:12px;padding:20px;box-shadow:0 8px 30px rgba(2,6,23,0.6)}
+
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .title{font-size:20px;font-weight:700;display:flex;flex-direction:column}
+    .title span.name{font-size:28px;color:var(--accent)}
+    .subtitle{font-size:12px;color:var(--muted)}
+
+    /* Menu */
+    .menu{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+    .btn{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:12px 16px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);cursor:pointer}
+    .btn.primary{background:linear-gradient(180deg,var(--accent),#ff6b7a);color:#fff;border:none;font-weight:700}
+
+    /* Layout */
+    .main-grid{display:grid;grid-template-columns:1fr 320px;gap:16px}
+    .game-area{background:linear-gradient(180deg,#071427,#082235);border-radius:10px;overflow:hidden;padding:8px;position:relative}
+    canvas{display:block;width:100%;height:480px;background:#071423;border-radius:8px}
+
+    .sidebar{background:linear-gradient(180deg,rgba(255,255,255,0.015),transparent);padding:12px;border-radius:8px}
+    .panel-block{margin-bottom:12px}
+    label{font-size:13px;color:var(--muted)}
+
+    input[type=text]{width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:#fff}
+
+    .leader{display:flex;flex-direction:column;gap:6px}
+    .leader-row{display:flex;justify-content:space-between;padding:8px;border-radius:6px;background:rgba(255,255,255,0.01);font-size:14px}
+
+    /* Pause overlay */
+    .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+    .modal{background:rgba(4,8,15,0.9);padding:20px;border-radius:10px;min-width:320px;text-align:center}
+    .modal button{margin:6px}
+
+    /* footer */
+    footer{font-size:12px;color:var(--muted);margin-top:12px;display:flex;justify-content:space-between}
+
+    /* small helpers */
+    .row{display:flex;gap:8px;align-items:center}
+    .muted{color:var(--muted)}
+
+    /* HUD */
+    .hud{position:relative}
+    .topbar{display:flex;justify-content:space-between;margin-bottom:8px}
+    .score{font-weight:700}
+
+    @media (max-width:900px){.main-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="panel">
+      <header>
+        <div class="title">
+          <span class="name">Tiro Rápido</span>
+          <span class="subtitle">Desenvolvedores: Thiago, Marcos Vittor e Lara</span>
+        </div>
+        <div class="row">
+          <div class="muted">Versão Demo • Front-end</div>
+        </div>
+      </header>
+
+      <nav class="menu">
+        <button class="btn primary" id="playBtn">Play</button>
+        <button class="btn" id="configBtn">Configuração</button>
+        <div style="flex:1"></div>
+        <div class="muted">Nome do Jogo: <strong>Tiro Rápido</strong></div>
+      </nav>
+
+      <div class="main-grid">
+        <div class="game-area">
+          <div class="hud">
+            <div class="topbar">
+              <div class="score">Score: <span id="score">0</span></div>
+              <div class="row">
+                <div class="muted">Jogador: <strong id="playerNameDisplay">Jogador</strong></div>
+                <button class="btn" id="pauseBtn">Pausar (Esc)</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="position:relative">
+            <canvas id="gameCanvas" width="800" height="480"></canvas>
+
+            <!-- Pause overlay (hidden) -->
+            <div id="pauseOverlay" class="overlay" style="display:none;">
+              <div class="modal">
+                <h3 id="overlayTitle">Pausado</h3>
+                <div style="margin:10px 0">Score: <strong id="pauseScore">0</strong></div>
+                <div>
+                  <button class="btn" id="resumeBtn">Continuar</button>
+                  <button class="btn" id="backBtn">Voltar</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <aside class="sidebar">
+          <div class="panel-block">
+            <label>Digite seu nome</label>
+            <input id="playerName" type="text" placeholder="Seu nome aqui" />
+            <div style="margin-top:8px"><button class="btn" id="saveNameBtn">Salvar nome</button></div>
+          </div>
+
+          <div class="panel-block">
+            <label>Classificação (Leaderboard)</label>
+            <div id="leaderboard" class="leader"></div>
+          </div>
+
+          <div class="panel-block">
+            <label>Controles</label>
+            <div class="muted">Mover: ← → ou A D • Pular: W ou Espaço • Atirar: Clique ou K • Pausar: Esc</div>
+          </div>
+
+          <div class="panel-block">
+            <label>Configuração</label>
+            <div class="row" style="margin-top:8px">
+              <label style="width:100%">Dificuldade
+                <select id="difficulty" style="width:100%;margin-top:6px;padding:8px;border-radius:8px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.04)">
+                  <option value="easy">Fácil</option>
+                  <option value="normal" selected>Normal</option>
+                  <option value="hard">Difícil</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+        </aside>
+      </div>
+
+      <footer>
+        <div>Desenvolvedores: Thiago, Marcos Vittor, Lara</div>
+        <div class="muted">Feito com HTML5, CSS e JavaScript</div>
+      </footer>
+    </div>
+  </div>
+
+<script>
+/* ----- Jogo: motor simples com canvas ----- */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let lastTs = 0;
+let keys = {};
+let bullets = [];
+let lastShot = 0;
+let reloadTime = 0.3; // segundos
+let targets = [];
+let score = 0;
+let running = false;
+let paused = false;
+let difficulty = 'normal';
+
+// Player (boneco)
+const player = {
+  x: 100, y: 380, w: 32, h:48, vx:0, vy:0, speed:200, onGround:false, color:'#7bd389', alive:true
+};
+
+// Ground
+const groundY = 430;
+
+// difficulty timer (in seconds)
+let difficultyTimer = 0;
+
+// Controls
+window.addEventListener('keydown', e=>{keys[e.key.toLowerCase()] = true; if(e.key==='Escape') togglePause();});
+window.addEventListener('keyup', e=>{keys[e.key.toLowerCase()] = false;});
+canvas.addEventListener('click', e=>{shoot();});
+
+// UI elements
+const scoreEl = document.getElementById('score');
+const playerNameInput = document.getElementById('playerName');
+const playerNameDisplay = document.getElementById('playerNameDisplay');
+const saveNameBtn = document.getElementById('saveNameBtn');
+const playBtn = document.getElementById('playBtn');
+const configBtn = document.getElementById('configBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const pauseOverlay = document.getElementById('pauseOverlay');
+const resumeBtn = document.getElementById('resumeBtn');
+const backBtn = document.getElementById('backBtn');
+const pauseScore = document.getElementById('pauseScore');
+const leaderboardEl = document.getElementById('leaderboard');
+const difficultySelect = document.getElementById('difficulty');
+const overlayTitle = document.getElementById('overlayTitle');
+
+// Leaderboard via localStorage
+function loadLeaderboard(){
+  const raw = localStorage.getItem('tr_leaderboard');
+  return raw?JSON.parse(raw):[];
+}
+function saveLeaderboard(list){localStorage.setItem('tr_leaderboard',JSON.stringify(list));}
+function addToLeaderboard(name,score){
+  const list = loadLeaderboard();
+  list.push({name,score,date:new Date().toISOString()});
+  list.sort((a,b)=>b.score-a.score);
+  saveLeaderboard(list.slice(0,20));
+  renderLeaderboard();
+}
+function renderLeaderboard(){
+  const list = loadLeaderboard();
+  leaderboardEl.innerHTML = '';
+  if(list.length===0){leaderboardEl.innerHTML = '<div class="muted">Sem registros ainda.</div>';return}
+  list.forEach((it,idx)=>{
+    const row = document.createElement('div'); row.className='leader-row';
+    row.innerHTML = `<div>#${idx+1} ${it.name}</div><div>${it.score}</div>`;
+    leaderboardEl.appendChild(row);
+  });
+}
+
+// Game API-ish functions (local front-end API)
+function startGame(){
+  bullets = [];
+  targets = [];
+  score = 0;
+  difficultyTimer = 0;
+  player.alive = true;
+  scoreEl.textContent = score;
+  player.x = 100; player.y = 380; player.vx=0; player.vy=0;
+  running = true; paused = false; pauseOverlay.style.display='none';
+  spawnWave();
+  lastTs = performance.now();
+  requestAnimationFrame(loop);
+}
+function stopGame(){
+  running = false;
+}
+function togglePause(){
+  if(!running) return;
+  paused = !paused;
+  pauseOverlay.style.display = paused? 'flex' : 'none';
+  pauseScore.textContent = score;
+  overlayTitle.textContent = paused ? 'Pausado' : 'Game Over';
+}
+
+function spawnWave(){
+  const base = difficulty === 'easy' ? 3 : difficulty==='normal' ? 5 : 8;
+  const extra = Math.floor(difficultyTimer / 10); // a cada 10s, aumenta
+  const count = Math.max(1, base + extra);
+  for(let i=0;i<count;i++){
+    createTarget();
+  }
+}
+function createTarget() {
+  const w = 36, h = 48;
+  const y = groundY - h; // inimigos no chão
+  const speedMin = 60, speedMax = 140;
+  const speed = -(speedMin + Math.random() * (speedMax - speedMin)) * (1 + difficultyTimer/60);
+  targets.push({
+    x: canvas.width + Math.random() * 300,
+    y: y,
+    w: w,
+    h: h,
+    vx: speed,
+    color: '#ff7043',
+    hp: 1
+  });
+}
+
+function shoot(){
+  if(!running || paused || !player.alive) return;
+  const now = performance.now() / 1000;
+  if(now - lastShot < reloadTime) return; // ainda recarregando
+  lastShot = now;
+  bullets.push({x:player.x+player.w/2,y:player.y+10,vx:550,w:8,h:4});
+}
+
+function update(dt){
+  // increase difficulty timer while running
+  difficultyTimer += dt;
+
+  // inputs
+  const left = keys['arrowleft'] || keys['a'];
+  const right = keys['arrowright'] || keys['d'];
+  const jump = keys['w'] || keys[' '];
+  const shootKey = keys['k'];
+  if(shootKey){ if(!keys._kdown){ shoot(); keys._kdown=true }} else keys._kdown=false;
+
+  // movement
+  player.vx = 0;
+  if(left) player.vx = -player.speed;
+  if(right) player.vx = player.speed;
+  if(jump && player.onGround){ player.vy = -420; player.onGround=false; }
+
+  // physics
+  player.vy += 1200 * dt; // gravity
+  player.x += player.vx * dt;
+  player.y += player.vy * dt;
+  if(player.y + player.h >= groundY){ player.y = groundY - player.h; player.vy = 0; player.onGround = true; }
+  if(player.x < 0) player.x = 0; if(player.x + player.w > canvas.width) player.x = canvas.width - player.w;
+
+  // bullets
+  for(let i=bullets.length-1;i>=0;i--){
+    const b = bullets[i]; b.x += b.vx * dt;
+    if(b.x > canvas.width) bullets.splice(i,1);
+  }
+
+  // targets movement and recycling
+  for(let i=targets.length-1;i>=0;i--){
+    const t = targets[i]; t.x += t.vx * dt;
+    if(t.x + t.w < -50) { targets.splice(i,1); createTarget(); }
+  }
+
+  // check player-enemy collision -> player dies
+  if(player.alive){
+    for(let i=targets.length-1;i>=0;i--){
+      const t = targets[i];
+      if(rectOverlap(player, t)){
+        player.alive = false;
+        gameOver();
+        return;
+      }
+    }
+  }
+
+  // bullet-target collisions
+  for(let i=targets.length-1;i>=0;i--){
+    const t = targets[i];
+    for(let j=bullets.length-1;j>=0;j--){
+      const b = bullets[j];
+      if(rectOverlap(b,t)){
+        bullets.splice(j,1);
+        t.hp -= 1;
+        if(t.hp<=0){ targets.splice(i,1); score += 1; scoreEl.textContent = score; createTarget(); }
+        break;
+      }
+    }
+  }
+
+  // every 5 seconds spawn more enemies gradually
+  if(difficultyTimer > 5 && Math.random() < dt * 0.5){
+    createTarget();
+  }
+}
+
+function rectOverlap(a,b){
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function render(){
+  // clear
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // background grid / ground
+  ctx.fillStyle = '#071423'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = '#0b2a3a'; ctx.fillRect(0,groundY,canvas.width,canvas.height-groundY);
+
+  // player (boneco)
+  if(player.alive){
+    drawCharacter(player);
+  } else {
+    // dead silhouette
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = '#444'; ctx.fillRect(player.x, player.y, player.w, player.h);
+    ctx.globalAlpha = 1;
+  }
+
+  // bullets
+  bullets.forEach(b=>{
+    ctx.fillStyle = '#fff'; ctx.fillRect(b.x,b.y,b.w,b.h);
+  });
+
+  // enemies
+  targets.forEach(t => {
+    drawEnemy(t);
+  });
+
+  // HUD crosshair (near player)
+  ctx.beginPath(); ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.moveTo(player.x+player.w/2, player.y+player.h/2-20); ctx.lineTo(player.x+player.w/2, player.y+player.h/2+20); ctx.stroke();
+
+  // reload indicator
+  const now = performance.now() / 1000;
+  const since = Math.min((now - lastShot) / reloadTime, 1);
+  ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fillRect(10,10,120,10);
+  ctx.fillStyle = '#00ffb3'; ctx.fillRect(10,10,120*since,10);
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.strokeRect(10,10,120,10);
+
+  // difficulty hint
+  ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fillRect(10,30,200,8);
+  const diffPercent = Math.min(difficultyTimer / 60, 1);
+  ctx.fillStyle = '#ffb86b'; ctx.fillRect(10,30,200*diffPercent,8);
+}
+
+function drawCharacter(p) {
+  // corpo
+  ctx.fillStyle = p.color;
+  ctx.fillRect(p.x, p.y, p.w, p.h);
+
+  // cabeça
+  ctx.beginPath();
+  ctx.fillStyle = '#ffe7c4';
+  ctx.arc(p.x + p.w/2, p.y - 10, 10, 0, Math.PI * 2);
+  ctx.fill();
+
+  // olhos
+  ctx.fillStyle = '#000';
+  ctx.fillRect(p.x + p.w/2 - 5, p.y - 14, 3, 3);
+  ctx.fillRect(p.x + p.w/2 + 2, p.y - 14, 3, 3);
+}
+
+function drawEnemy(t) {
+  // corpo
+  ctx.fillStyle = t.color;
+  ctx.fillRect(t.x, t.y, t.w, t.h);
+
+  // cabeça
+  ctx.beginPath();
+  ctx.fillStyle = '#ffe7c4';
+  ctx.arc(t.x + t.w/2, t.y - 10, 10, 0, Math.PI * 2);
+  ctx.fill();
+
+  // olhos ameaçadores
+  ctx.fillStyle = '#000';
+  ctx.fillRect(t.x + t.w/2 - 6, t.y - 14, 4, 3);
+  ctx.fillRect(t.x + t.w/2 + 2, t.y - 14, 4, 3);
+}
+
+function loop(ts){
+  if(!running) return;
+  const dt = Math.min(0.05, (ts - lastTs)/1000);
+  lastTs = ts;
+  if(!paused){
+    update(dt);
+    render();
+  }
+  requestAnimationFrame(loop);
+}
+
+// UI wiring
+playBtn.addEventListener('click', ()=>{ const name = localStorage.getItem('tr_name') || 'Jogador'; playerNameDisplay.textContent = name; startGame(); });
+configBtn.addEventListener('click', ()=>{ alert('Configurações rápidas:\n- Ajuste a dificuldade na lateral.'); });
+saveNameBtn.addEventListener('click', ()=>{ const name = playerNameInput.value.trim() || 'Jogador'; localStorage.setItem('tr_name', name); playerNameDisplay.textContent = name; renderLeaderboard(); alert('Nome salvo: '+name); });
+pauseBtn.addEventListener('click', togglePause);
+resumeBtn.addEventListener('click', ()=>{ togglePause(); });
+backBtn.addEventListener('click', ()=>{ // voltar para menu
+  if(confirm('Salvar score de '+score+' e voltar ao menu?')){ saveAndStop(); renderLeaderboard(); } else { stopGame(); }
+  pauseOverlay.style.display='none';
+});
+difficultySelect.addEventListener('change', e=>{ difficulty = e.target.value; });
+
+function gameOver(){
+  running = false;
+  paused = true;
+  pauseOverlay.style.display = 'flex';
+  pauseScore.textContent = score;
+  overlayTitle.textContent = 'Game Over';
+  addToLeaderboard(localStorage.getItem('tr_name')||'Jogador', score);
+}
+
+// On game end (for demo we save on leaving play area by pressing back)
+window.addEventListener('beforeunload', ()=>{ if(running) addToLeaderboard(localStorage.getItem('tr_name')||'Jogador', score); });
+
+// when game stops manually save score
+function saveAndStop(){ addToLeaderboard(localStorage.getItem('tr_name')||'Jogador', score); stopGame(); }
+
+// Initial render of leaderboard
+renderLeaderboard();
+
+// Small accessibility: set stored name to input and display
+playerNameInput.value = localStorage.getItem('tr_name') || '';
+playerNameDisplay.textContent = localStorage.getItem('tr_name') || 'Jogador';
+
+// Expose a minimal front-end API for integration
+window.ShooterAPI = {
+  start: startGame,
+  stop: stopGame,
+  pause: ()=>{ if(!paused) togglePause(); },
+  resume: ()=>{ if(paused) togglePause(); },
+  getScore: ()=>score,
+  setDifficulty: d=>{ difficulty = d; difficultySelect.value = d; },
+  submitScore: ()=> addToLeaderboard(localStorage.getItem('tr_name')||'Jogador', score),
+  setPlayerName: n=>{ localStorage.setItem('tr_name', n); playerNameDisplay.textContent = n; playerNameInput.value = n; }
+};
+
+</script>
+</body>
+</html>
